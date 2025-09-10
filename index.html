@@ -1257,9 +1257,37 @@
           return response.json();
         })
         .then(data => {
-          lotteryData = data;
+          // Process the data to match our expected format
+          lotteryData = data.map((item, index) => {
+            // Extract date, code, digits6, and last2 from the JSON structure
+            const date = item.date || '';
+            const code = item.letter || item.code || '';
+            const digits6 = item.digits6 || '';
+            const last2 = item.last2 || '';
+            
+            // Convert digits6 to an array of numbers
+            const numbers = digits6 ? digits6.split('').map(Number) : [];
+            
+            return {
+              date: date,
+              code: code,
+              digits6: digits6,
+              numbers: numbers,
+              last2: String(last2).padStart(2, "0"),
+              _parsedDate: date ? new Date(date) : null,
+              _idx: index
+            };
+          }).sort((a, b) => {
+            // Sort by date, newest first
+            if (!a._parsedDate || !b._parsedDate) return 0;
+            return b._parsedDate - a._parsedDate;
+          });
+          
+          // Reassign indices after sort
+          lotteryData.forEach((r, i) => r._idx = i);
+          
           statusIndicator.className = 'status-indicator connected';
-          statusText.textContent = 'දත්ත සම්බන්ධතාවය සාර්ථකයි';
+          statusText.textContent = `දත්ත සාර්ථකව ලබාගත්තා (${lotteryData.length} records)`;
           populateDataTable();
         })
         .catch(error => {
@@ -1276,16 +1304,16 @@
     // Use sample data if JSON file is not available
     function useSampleData() {
       lotteryData = [
-        { date: "09/08/2023", code: "A", digits6: "123456", lastTwo: "56" },
-        { date: "09/08/2022", code: "B", digits6: "234567", lastTwo: "67" },
-        { date: "09/08/2021", code: "C", digits6: "345678", lastTwo: "78" },
-        { date: "09/08/2020", code: "D", digits6: "456789", lastTwo: "89" },
-        { date: "08/08/2023", code: "E", digits6: "567890", lastTwo: "90" },
-        { date: "08/08/2022", code: "F", digits6: "678901", lastTwo: "01" },
-        { date: "08/08/2021", code: "G", digits6: "789012", lastTwo: "12" },
-        { date: "08/08/2020", code: "H", digits6: "890123", lastTwo: "23" },
-        { date: "07/08/2023", code: "I", digits6: "901234", lastTwo: "34" },
-        { date: "07/08/2022", code: "J", digits6: "012345", lastTwo: "45" }
+        { date: "09/08/2023", code: "A", digits6: "123456", lastTwo: "56", numbers: [1,2,3,4,5,6] },
+        { date: "09/08/2022", code: "B", digits6: "234567", lastTwo: "67", numbers: [2,3,4,5,6,7] },
+        { date: "09/08/2021", code: "C", digits6: "345678", lastTwo: "78", numbers: [3,4,5,6,7,8] },
+        { date: "09/08/2020", code: "D", digits6: "456789", lastTwo: "89", numbers: [4,5,6,7,8,9] },
+        { date: "08/08/2023", code: "E", digits6: "567890", lastTwo: "90", numbers: [5,6,7,8,9,0] },
+        { date: "08/08/2022", code: "F", digits6: "678901", lastTwo: "01", numbers: [6,7,8,9,0,1] },
+        { date: "08/08/2021", code: "G", digits6: "789012", lastTwo: "12", numbers: [7,8,9,0,1,2] },
+        { date: "08/08/2020", code: "H", digits6: "890123", lastTwo: "23", numbers: [8,9,0,1,2,3] },
+        { date: "07/08/2023", code: "I", digits6: "901234", lastTwo: "34", numbers: [9,0,1,2,3,4] },
+        { date: "07/08/2022", code: "J", digits6: "012345", lastTwo: "45", numbers: [0,1,2,3,4,5] }
       ];
       
       populateDataTable();
@@ -1303,8 +1331,8 @@
           <td>${index + 1}</td>
           <td>${record.date}</td>
           <td>${record.code}</td>
-          <td>${record.lastTwo}</td>
-          <td>${record.digits6}</td>
+          <td>${record.last2 || record.lastTwo || '-'}</td>
+          <td>${record.code} ${record.digits6 ? record.digits6.match(/.{1}/g).join(' ') : "-"}</td>
         `;
         
         tbody.appendChild(row);
@@ -1337,7 +1365,9 @@
       setTimeout(() => {
         // Find matches for the selected date pattern
         const dateMatches = lotteryData.filter(record => {
-          // Extract month and day from record date (assuming format MM/DD/YYYY)
+          if (!record.date) return false;
+          
+          // Parse record date (assuming format MM/DD/YYYY)
           const recordDateParts = record.date.split('/');
           if (recordDateParts.length < 3) return false;
           
@@ -1464,13 +1494,21 @@
       matchesContainer.appendChild(enteredCard);
       
       // Create cards for each match
-      matches.forEach(match => {
+      matches.forEach((match, index) => {
         const matchCard = document.createElement('div');
         matchCard.className = 'box-card';
         
-        // Calculate sums
-        const firstThreeSum = calculateDigitSum(match.digits6.substring(0, 3));
-        const lastThreeSum = calculateDigitSum(match.digits6.substring(3));
+        // Apply the new calculation logic
+        const firstThree = match.numbers.slice(0, 3);
+        const lastThree = match.numbers.slice(3);
+        
+        const firstSum = firstThree.reduce((a, b) => a + b, 0);
+        const lastSum = lastThree.reduce((a, b) => a + b, 0);
+        
+        const firstFinal = reduceToSingleDigit(firstSum);
+        const lastFinal = reduceToSingleDigit(lastSum);
+        
+        const finalResult = reduceToSingleDigit(firstFinal + lastFinal);
         
         matchCard.innerHTML = `
           <div class="box-header">
@@ -1480,18 +1518,19 @@
           <div class="match-item">
             <div class="match-meta">
               <b>ප්‍රතිඵලය</b>
-              ${match.date}<br>
+              #${index + 1}<br>
               කේතය: ${match.code}<br>
-              අවසන් 2: ${match.lastTwo}
+              අවසන් 2: ${match.last2 || match.lastTwo || '-'}
             </div>
             <div class="match-content">
               <div class="match-digits">${formatNumber(match.digits6)}</div>
-              <div class="match-full">පළමු 3: ${match.digits6.substring(0, 3)} | අවසාන 3: ${match.digits6.substring(3)}</div>
+              <div class="match-full">සම්පූර්ණ අංක: ${match.numbers.join(' ')}</div>
             </div>
             <div class="match-below">
               <b>ගණනය කිරීම්</b><br>
-              පළමු 3 එකතුව: ${firstThreeSum}<br>
-              අවසාන 3 එකතුව: ${lastThreeSum}
+              පළමු අංක 3: ${firstThree.join(' + ')} = ${firstSum} → ${firstFinal}<br>
+              අවසාන අංක 3: ${lastThree.join(' + ')} = ${lastSum} → ${lastFinal}<br>
+              අවසාන ප්‍රතිඵලය: ${firstFinal} + ${lastFinal} = ${finalResult}
             </div>
           </div>
         `;
@@ -1515,6 +1554,15 @@
       }
       
       return sum;
+    }
+
+    // Reduce a number to a single digit using digit sum
+    function reduceToSingleDigit(num) {
+      let result = num;
+      while (result > 9) {
+        result = result.toString().split('').reduce((sum, digit) => sum + parseInt(digit), 0);
+      }
+      return result;
     }
 
     // Export results to Excel
