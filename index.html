@@ -1248,7 +1248,8 @@
       statusIndicator.className = 'status-indicator connecting';
       statusText.textContent = 'දත්ත ලබා ගනිමින්...';
       
-      fetch('https://raw.githubusercontent.com/your-username/your-repo/main/lottery_records.json')
+      // Use the correct JSON file path (same directory as HTML file)
+      fetch('lottery_records.json')
         .then(response => {
           if (!response.ok) {
             throw new Error('දත්ත ලබා ගැනීමේ දෝෂයක්: ' + response.status);
@@ -1265,8 +1266,29 @@
           console.error('දත්ත ලබා ගැනීමේ දෝෂය:', error);
           statusIndicator.className = 'status-indicator error';
           statusText.textContent = 'දත්ත සම්බන්ධතාවය අසාර්ථකයි';
-          showAlert('දෝෂය', 'දත්ත ලබා ගැනීමට නොහැකි විය. කරුණාකර පසුව උත්සාහ කරන්න.', 'error');
+          
+          // Use sample data if the JSON file is not available
+          useSampleData();
+          showAlert('දත්ත අනතුරු ඇඟවීම', 'JSON ගොනුව ලබා ගත නොහැකි විය. නිදර්ශන දත්ත භාවිතා කරමින්.', 'warning');
         });
+    }
+
+    // Use sample data if JSON file is not available
+    function useSampleData() {
+      lotteryData = [
+        { date: "09/08/2023", code: "A", digits6: "123456", lastTwo: "56" },
+        { date: "09/08/2022", code: "B", digits6: "234567", lastTwo: "67" },
+        { date: "09/08/2021", code: "C", digits6: "345678", lastTwo: "78" },
+        { date: "09/08/2020", code: "D", digits6: "456789", lastTwo: "89" },
+        { date: "08/08/2023", code: "E", digits6: "567890", lastTwo: "90" },
+        { date: "08/08/2022", code: "F", digits6: "678901", lastTwo: "01" },
+        { date: "08/08/2021", code: "G", digits6: "789012", lastTwo: "12" },
+        { date: "08/08/2020", code: "H", digits6: "890123", lastTwo: "23" },
+        { date: "07/08/2023", code: "I", digits6: "901234", lastTwo: "34" },
+        { date: "07/08/2022", code: "J", digits6: "012345", lastTwo: "45" }
+      ];
+      
+      populateDataTable();
     }
 
     // Populate data table with lottery records
@@ -1315,10 +1337,14 @@
       setTimeout(() => {
         // Find matches for the selected date pattern
         const dateMatches = lotteryData.filter(record => {
-          const recordDate = new Date(record.date);
-          const recordMonth = String(recordDate.getMonth() + 1).padStart(2, '0');
-          const recordDay = String(recordDate.getDate()).padStart(2, '0');
-          return `${recordMonth}/${recordDay}` === datePattern;
+          // Extract month and day from record date (assuming format MM/DD/YYYY)
+          const recordDateParts = record.date.split('/');
+          if (recordDateParts.length < 3) return false;
+          
+          const recordMonth = recordDateParts[0];
+          const recordDay = recordDateParts[1];
+          
+          return recordMonth === selectedMonth && recordDay === selectedDay;
         });
         
         // Hide loading animation
@@ -1399,9 +1425,12 @@
       matchesContainer.innerHTML = '';
       
       if (matches.length === 0) {
+        const selectedDate = new Date(dateInput.value);
+        const formattedDate = selectedDate.toLocaleDateString('si-LK');
+        
         matchesContainer.innerHTML = `
           <div class="no-match">
-            <i class="fas fa-exclamation-circle"></i> ${dateInput.valueAsDate.toLocaleDateString('si-LK')} දිනට ගැලපෙන ලොතරැයි ප්‍රතිඵල කිසිවක් හමු නොවීය.
+            <i class="fas fa-exclamation-circle"></i> ${formattedDate} දිනට ගැලපෙන ලොතරැයි ප්‍රතිඵල කිසිවක් හමු නොවීය.
           </div>
         `;
         return;
