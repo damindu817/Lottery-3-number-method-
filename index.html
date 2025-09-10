@@ -1041,31 +1041,35 @@
   <!-- Status Indicator -->
   <div class="status-indicator connecting" id="statusIndicator">
     <span class="status-dot"></span>
-    <span id="statusText">දත්ත ලබා ගනිමින්...</span>
+    <span id="statusText">JSON දත්ත ලබා ගැනීම...</span>
   </div>
 
   <!-- Keypad -->
-  <div class="keypad-container" id="keypad">
+  <div class="keypad-container" id="keypadContainer">
     <div class="keypad">
-      <button class="keypad-btn" data-value="1">1</button>
-      <button class="keypad-btn" data-value="2">2</button>
-      <button class="keypad-btn" data-value="3">3</button>
-      <button class="keypad-btn" data-value="4">4</button>
-      <button class="keypad-btn" data-value="5">5</button>
-      <button class="keypad-btn" data-value="6">6</button>
-      <button class="keypad-btn" data-value="7">7</button>
-      <button class="keypad-btn" data-value="8">8</button>
-      <button class="keypad-btn" data-value="9">9</button>
-      <button class="keypad-btn keypad-clear" id="keypadClear">හිස් කරන්න</button>
-      <button class="keypad-btn" data-value="0">0</button>
-      <button class="keypad-btn keypad-close" id="keypadClose"><i class="fas fa-times"></i></button>
+      <button class="keypad-btn" data-key="1">1</button>
+      <button class="keypad-btn" data-key="2">2</button>
+      <button class="keypad-btn" data-key="3">3</button>
+      <button class="keypad-btn" data-key="4">4</button>
+      <button class="keypad-btn" data-key="5">5</button>
+      <button class="keypad-btn" data-key="6">6</button>
+      <button class="keypad-btn" data-key="7">7</button>
+      <button class="keypad-btn" data-key="8">8</button>
+      <button class="keypad-btn" data-key="9">9</button>
+      <button class="keypad-btn" data-key="0">0</button>
+      <button class="keypad-btn keypad-clear" id="keypadClear">
+        <i class="fas fa-backspace"></i> හිස් කරන්න
+      </button>
+      <button class="keypad-btn keypad-close" id="keypadClose">
+        <i class="fas fa-times"></i>
+      </button>
     </div>
   </div>
 
   <!-- Animation Overlay -->
   <div class="overlay" id="loadingOverlay">
     <div class="lottery-animation-area" id="animationArea"></div>
-    <div class="loading-text">ඔබේ අංක විශ්ලේෂණය කරමින්...</div>
+    <div class="loading-text">ප්‍රතිඵල ලබා ගැනීම...</div>
     <div class="progress-bar">
       <div class="progress-fill" id="progressFill"></div>
     </div>
@@ -1076,22 +1080,33 @@
     <i class="fas fa-exclamation-circle"></i>
     <div class="alert-content">
       <div class="alert-title" id="alertTitle">අවවාදයයි!</div>
-      <div class="alert-message" id="alertMessage">කරුණාකර සියලු ක්ෂේත්‍ර පුරවන්න.</div>
+      <div class="alert-message" id="alertMessage">කරුණාකර සියලුම ක්ෂේත්‍ර පුරවන්න.</div>
     </div>
-    <button class="alert-close" id="alertClose"><i class="fas fa-times"></i></button>
+    <button class="alert-close" id="alertClose">
+      <i class="fas fa-times"></i>
+    </button>
   </div>
 
   <script>
-    // DOM Elements
+    // Global variables
+    let lotteryData = [];
+    let currentInputIndex = 0;
+    let selectedDate = null;
+
+    // DOM elements
     const inputBoxes = document.querySelectorAll('.input-box input');
+    const datePickerContainer = document.getElementById('datePickerContainer');
+    const dateInput = document.getElementById('dateInput');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const resetBtn = document.getElementById('resetBtn');
     const matchesContainer = document.getElementById('matches');
     const dataTable = document.getElementById('dataTable');
-    const keypad = document.getElementById('keypad');
-    const keypadButtons = document.querySelectorAll('.keypad-btn[data-value]');
+    const keypadContainer = document.getElementById('keypadContainer');
+    const keypadBtns = document.querySelectorAll('.keypad-btn');
     const keypadClear = document.getElementById('keypadClear');
     const keypadClose = document.getElementById('keypadClose');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
     const loadingOverlay = document.getElementById('loadingOverlay');
     const progressFill = document.getElementById('progressFill');
     const animationArea = document.getElementById('animationArea');
@@ -1099,63 +1114,40 @@
     const alertTitle = document.getElementById('alertTitle');
     const alertMessage = document.getElementById('alertMessage');
     const alertClose = document.getElementById('alertClose');
-    const statusIndicator = document.getElementById('statusIndicator');
-    const statusText = document.getElementById('statusText');
-    const currentDateTime = document.getElementById('currentDateTime');
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const copyTextBtn = document.getElementById('copyTextBtn');
-    const datePickerContainer = document.getElementById('datePickerContainer');
-    const dateInput = document.getElementById('dateInput');
-
-    // Global variables
-    let lotteryData = [];
-    let currentInput = null;
-    let animationBalls = [];
-    let animationInterval = null;
+    const currentDateTime = document.getElementById('currentDateTime');
 
     // Initialize the application
-    function initApp() {
+    function init() {
       updateDateTime();
       setInterval(updateDateTime, 1000);
       
-      // Set today's date as default
-      const today = new Date();
-      dateInput.valueAsDate = today;
+      // Set up event listeners
+      setupEventListeners();
       
-      // Event listeners for input boxes
-      inputBoxes.forEach(box => {
-        box.addEventListener('focus', handleInputFocus);
-        box.addEventListener('click', handleInputFocus);
-      });
+      // Load JSON data
+      loadJSONData();
       
-      // Event listeners for keypad
-      keypadButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          if (currentInput) {
-            currentInput.value = btn.getAttribute('data-value');
-            moveToNextInput(currentInput);
-          }
+      // Initialize input boxes
+      inputBoxes.forEach((box, index) => {
+        box.addEventListener('focus', () => {
+          currentInputIndex = index;
+          showKeypad();
         });
       });
       
-      keypadClear.addEventListener('click', clearCurrentInput);
-      keypadClose.addEventListener('click', hideKeypad);
-      
-      // Other event listeners
-      analyzeBtn.addEventListener('click', analyzeNumbers);
-      resetBtn.addEventListener('click', resetInputs);
-      alertClose.addEventListener('click', hideAlert);
-      exportExcelBtn.addEventListener('click', exportToExcel);
-      copyTextBtn.addEventListener('click', copyResultsToClipboard);
-      
-      // Load data
-      loadLotteryData();
+      // Date input change event
+      dateInput.addEventListener('change', (e) => {
+        selectedDate = e.target.value;
+      });
     }
 
     // Update date and time display
     function updateDateTime() {
       const now = new Date();
       const options = { 
+        weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric',
@@ -1166,60 +1158,78 @@
       currentDateTime.textContent = now.toLocaleDateString('si-LK', options);
     }
 
-    // Handle input focus - show keypad
-    function handleInputFocus(e) {
-      currentInput = e.target;
-      showKeypad();
+    // Set up event listeners
+    function setupEventListeners() {
+      // Analyze button click
+      analyzeBtn.addEventListener('click', analyzeNumbers);
+      
+      // Reset button click
+      resetBtn.addEventListener('click', resetInputs);
+      
+      // Keypad buttons
+      keypadBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-key');
+          if (key) {
+            inputBoxes[currentInputIndex].value = key;
+            moveToNextInput();
+          }
+        });
+      });
+      
+      // Keypad clear button
+      keypadClear.addEventListener('click', () => {
+        inputBoxes[currentInputIndex].value = '';
+      });
+      
+      // Keypad close button
+      keypadClose.addEventListener('click', hideKeypad);
+      
+      // Alert close button
+      alertClose.addEventListener('click', hideAlert);
+      
+      // Export buttons
+      exportExcelBtn.addEventListener('click', exportToExcel);
+      copyTextBtn.addEventListener('click', copyToClipboard);
     }
 
     // Show the keypad
     function showKeypad() {
-      keypad.classList.add('visible');
+      keypadContainer.classList.add('visible');
     }
 
     // Hide the keypad
     function hideKeypad() {
-      keypad.classList.remove('visible');
-      currentInput = null;
+      keypadContainer.classList.remove('visible');
     }
 
-    // Clear the current input
-    function clearCurrentInput() {
-      if (currentInput) {
-        currentInput.value = '';
-        currentInput.focus();
-      }
-    }
-
-    // Move to next input field
-    function moveToNextInput(current) {
-      const index = Array.from(inputBoxes).indexOf(current);
-      if (index < inputBoxes.length - 1) {
-        inputBoxes[index + 1].focus();
+    // Move to the next input box
+    function moveToNextInput() {
+      if (currentInputIndex < inputBoxes.length - 1) {
+        currentInputIndex++;
+        inputBoxes[currentInputIndex].focus();
       } else {
         hideKeypad();
+        checkAllInputsFilled();
       }
-      
-      // Show date picker if all inputs are filled
-      checkInputsComplete();
     }
 
     // Check if all inputs are filled
-    function checkInputsComplete() {
-      const allFilled = Array.from(inputBoxes).every(input => input.value !== '');
+    function checkAllInputsFilled() {
+      const allFilled = Array.from(inputBoxes).every(box => box.value !== '');
       if (allFilled) {
         datePickerContainer.style.display = 'block';
-      } else {
-        datePickerContainer.style.display = 'none';
       }
     }
 
-    // Reset all input fields
+    // Reset all inputs
     function resetInputs() {
       inputBoxes.forEach(box => {
         box.value = '';
       });
       datePickerContainer.style.display = 'none';
+      dateInput.value = '';
+      selectedDate = null;
       matchesContainer.innerHTML = `
         <div class="no-match">
           <i class="fas fa-info-circle"></i> වක්‍රී-පද්ධතිය සූදානම් — අගයන් ඇතුළත් කර "විශ්ලේෂණය කරන්න" ඔබන්න.
@@ -1228,98 +1238,89 @@
       hideKeypad();
     }
 
-    // Show alert message
+    // Show alert
     function showAlert(title, message, type = 'warning') {
       alertTitle.textContent = title;
       alertMessage.textContent = message;
-      customAlert.className = 'custom-alert visible';
+      customAlert.className = `custom-alert ${type} visible`;
       
       // Auto hide after 5 seconds
-      setTimeout(hideAlert, 5000);
+      setTimeout(() => {
+        hideAlert();
+      }, 5000);
     }
 
-    // Hide alert message
+    // Hide alert
     function hideAlert() {
       customAlert.classList.remove('visible');
     }
 
-    // Load lottery data from JSON file
-    function loadLotteryData() {
-      statusIndicator.className = 'status-indicator connecting';
-      statusText.textContent = 'දත්ත ලබා ගනිමින්...';
+    // Show loading animation
+    function showLoading() {
+      progressFill.style.width = '0%';
+      loadingOverlay.classList.add('visible');
       
-      // Use the correct JSON file path (same directory as HTML file)
-      fetch('lottery_records.json')
+      // Animate progress bar
+      setTimeout(() => {
+        progressFill.style.width = '100%';
+      }, 100);
+      
+      // Create floating balls
+      createFloatingBalls();
+    }
+
+    // Hide loading animation
+    function hideLoading() {
+      loadingOverlay.classList.remove('visible');
+    }
+
+    // Create floating balls animation
+    function createFloatingBalls() {
+      animationArea.innerHTML = '';
+      
+      for (let i = 0; i < 15; i++) {
+        const ball = document.createElement('div');
+        ball.className = `lottery-ball ball-${(i % 6) + 1}`;
+        ball.textContent = Math.floor(Math.random() * 9) + 1;
+        
+        // Random position and animation
+        const left = Math.random() * 90 + 5; // 5% to 95%
+        const duration = Math.random() * 3 + 3; // 3 to 6 seconds
+        const delay = Math.random() * 2; // 0 to 2 seconds delay
+        
+        ball.style.left = `${left}%`;
+        ball.style.animation = `ballFloat ${duration}s ${delay}s forwards`;
+        
+        animationArea.appendChild(ball);
+      }
+    }
+
+    // Load JSON data
+    function loadJSONData() {
+      statusText.textContent = 'JSON දත්ත ලබා ගැනීම...';
+      
+      fetch('https://raw.githubusercontent.com/your-username/your-repo/main/lottery_records.json')
         .then(response => {
           if (!response.ok) {
-            throw new Error('දත්ත ලබා ගැනීමේ දෝෂයක්: ' + response.status);
+            throw new Error('දත්ත ලබා ගැනීමේ දෝෂයක්');
           }
           return response.json();
         })
         .then(data => {
-          // Process the data to match our expected format
-          lotteryData = data.map((item, index) => {
-            // Extract date, code, digits6, and last2 from the JSON structure
-            const date = item.date || '';
-            const code = item.letter || item.code || '';
-            const digits6 = item.digits6 || '';
-            const last2 = item.last2 || '';
-            
-            // Convert digits6 to an array of numbers
-            const numbers = digits6 ? digits6.split('').map(Number) : [];
-            
-            return {
-              date: date,
-              code: code,
-              digits6: digits6,
-              numbers: numbers,
-              last2: String(last2).padStart(2, "0"),
-              _parsedDate: date ? new Date(date) : null,
-              _idx: index
-            };
-          }).sort((a, b) => {
-            // Sort by date, newest first
-            if (!a._parsedDate || !b._parsedDate) return 0;
-            return b._parsedDate - a._parsedDate;
-          });
-          
-          // Reassign indices after sort
-          lotteryData.forEach((r, i) => r._idx = i);
-          
+          lotteryData = data;
           statusIndicator.className = 'status-indicator connected';
-          statusText.textContent = `දත්ත සාර්ථකව ලබාගත්තා (${lotteryData.length} records)`;
+          statusText.textContent = 'දත්ත සම්පුර්ණයෙන් ලබා ගත්තා';
           populateDataTable();
         })
         .catch(error => {
-          console.error('දත්ත ලබා ගැනීමේ දෝෂය:', error);
+          console.error('Error loading JSON data:', error);
           statusIndicator.className = 'status-indicator error';
-          statusText.textContent = 'දත්ත සම්බන්ධතාවය අසාර්ථකයි';
-          
-          // Use sample data if the JSON file is not available
-          useSampleData();
-          showAlert('දත්ත අනතුරු ඇඟවීම', 'JSON ගොනුව ලබා ගත නොහැකි විය. නිදර්ශන දත්ත භාවිතා කරමින්.', 'warning');
+          statusText.textContent = 'දත්ත ලබා ගැනීමට නොහැකි විය';
+          showAlert('දෝෂය', 'දත්ත ලබා ගැනීමේ දෝෂයක්', 'error');
         });
     }
 
-    // Use sample data if JSON file is not available
-    function useSampleData() {
-      lotteryData = [
-        { date: "09/08/2023", code: "A", digits6: "123456", lastTwo: "56", numbers: [1,2,3,4,5,6] },
-        { date: "09/08/2022", code: "B", digits6: "234567", lastTwo: "67", numbers: [2,3,4,5,6,7] },
-        { date: "09/08/2021", code: "C", digits6: "345678", lastTwo: "78", numbers: [3,4,5,6,7,8] },
-        { date: "09/08/2020", code: "D", digits6: "456789", lastTwo: "89", numbers: [4,5,6,7,8,9] },
-        { date: "08/08/2023", code: "E", digits6: "567890", lastTwo: "90", numbers: [5,6,7,8,9,0] },
-        { date: "08/08/2022", code: "F", digits6: "678901", lastTwo: "01", numbers: [6,7,8,9,0,1] },
-        { date: "08/08/2021", code: "G", digits6: "789012", lastTwo: "12", numbers: [7,8,9,0,1,2] },
-        { date: "08/08/2020", code: "H", digits6: "890123", lastTwo: "23", numbers: [8,9,0,1,2,3] },
-        { date: "07/08/2023", code: "I", digits6: "901234", lastTwo: "34", numbers: [9,0,1,2,3,4] },
-        { date: "07/08/2022", code: "J", digits6: "012345", lastTwo: "45", numbers: [0,1,2,3,4,5] }
-      ];
-      
-      populateDataTable();
-    }
-
-    // Populate data table with lottery records
+    // Populate data table
     function populateDataTable() {
       const tbody = dataTable.querySelector('tbody');
       tbody.innerHTML = '';
@@ -1331,224 +1332,139 @@
           <td>${index + 1}</td>
           <td>${record.date}</td>
           <td>${record.code}</td>
-          <td>${record.last2 || record.lastTwo || '-'}</td>
-          <td>${record.code} ${record.digits6 ? record.digits6.match(/.{1}/g).join(' ') : "-"}</td>
+          <td>${record.lastTwo}</td>
+          <td>${record.digits6}</td>
         `;
         
         tbody.appendChild(row);
       });
     }
 
-    // Analyze the entered numbers
+    // Analyze the numbers
     function analyzeNumbers() {
       // Check if all inputs are filled
-      const allFilled = Array.from(inputBoxes).every(input => input.value !== '');
-      
+      const allFilled = Array.from(inputBoxes).every(box => box.value !== '');
       if (!allFilled) {
-        showAlert('අසම්පූර්ණ තොරතුරු', 'කරුණාකර සියලුම අංක ක්ෂේත්‍ර පුරවන්න.');
+        showAlert('අසම්පූර්ණ තොරතුරු', 'කරුණාකර සියලුම අංක ක්ෂේත්‍ර පුරවන්න', 'warning');
         return;
       }
       
-      // Get the entered numbers
-      const enteredNumbers = Array.from(inputBoxes).map(input => input.value).join('');
-      
-      // Get the selected date
-      const selectedDate = new Date(dateInput.value);
-      const selectedMonth = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const selectedDay = String(selectedDate.getDate()).padStart(2, '0');
-      const datePattern = `${selectedMonth}/${selectedDay}`;
+      // Check if date is selected
+      if (!selectedDate) {
+        showAlert('දිනය තෝරන්න', 'කරුණාකර දිනයක් තෝරන්න', 'warning');
+        return;
+      }
       
       // Show loading animation
-      showLoadingAnimation();
+      showLoading();
       
       // Simulate processing delay
       setTimeout(() => {
-        // Find matches for the selected date pattern
-        const dateMatches = lotteryData.filter(record => {
-          if (!record.date) return false;
-          
-          // Parse record date (assuming format MM/DD/YYYY)
-          const recordDateParts = record.date.split('/');
-          if (recordDateParts.length < 3) return false;
-          
-          const recordMonth = recordDateParts[0];
-          const recordDay = recordDateParts[1];
-          
-          return recordMonth === selectedMonth && recordDay === selectedDay;
+        // Get the input numbers
+        const inputNumbers = Array.from(inputBoxes).map(box => box.value).join('');
+        
+        // Extract month and day from selected date (MM/DD format)
+        const dateObj = new Date(selectedDate);
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const targetDate = `${month}/${day}`;
+        
+        // Find matching records for the selected date (any year)
+        const matchingRecords = lotteryData.filter(record => {
+          const recordDate = record.date;
+          const recordMonthDay = recordDate.substring(5); // Extract MM/DD part
+          return recordMonthDay === targetDate;
         });
         
         // Hide loading animation
-        hideLoadingAnimation();
+        hideLoading();
         
         // Display results
-        displayResults(enteredNumbers, dateMatches);
+        displayResults(inputNumbers, matchingRecords);
       }, 2000);
     }
 
-    // Show loading animation
-    function showLoadingAnimation() {
-      loadingOverlay.classList.add('visible');
-      progressFill.style.width = '0%';
-      
-      // Start progress bar animation
-      setTimeout(() => {
-        progressFill.style.width = '100%';
-      }, 100);
-      
-      // Create floating balls animation
-      createFloatingBalls();
-    }
-
-    // Hide loading animation
-    function hideLoadingAnimation() {
-      loadingOverlay.classList.remove('visible');
-      
-      // Stop and clear animation
-      if (animationInterval) {
-        clearInterval(animationInterval);
-        animationInterval = null;
-      }
-      
-      // Remove all balls
-      animationBalls.forEach(ball => {
-        if (ball.parentNode) {
-          ball.parentNode.removeChild(ball);
-        }
-      });
-      animationBalls = [];
-    }
-
-    // Create floating balls animation
-    function createFloatingBalls() {
-      if (animationInterval) {
-        clearInterval(animationInterval);
-      }
-      
-      animationInterval = setInterval(() => {
-        const ball = document.createElement('div');
-        ball.className = `lottery-ball ball-${Math.floor(Math.random() * 6) + 1}`;
-        ball.textContent = Math.floor(Math.random() * 10);
-        
-        // Random horizontal position
-        const leftPos = Math.random() * 90 + 5; // 5% to 95%
-        ball.style.left = `${leftPos}%`;
-        
-        // Random animation duration
-        const duration = Math.random() * 6 + 4; // 4s to 10s
-        ball.style.animation = `ballFloat ${duration}s linear forwards`;
-        
-        animationArea.appendChild(ball);
-        animationBalls.push(ball);
-        
-        // Remove ball after animation completes
-        setTimeout(() => {
-          if (ball.parentNode) {
-            ball.parentNode.removeChild(ball);
-            animationBalls = animationBalls.filter(b => b !== ball);
-          }
-        }, duration * 1000);
-      }, 300);
-    }
-
-    // Display analysis results
-    function displayResults(enteredNumbers, matches) {
-      matchesContainer.innerHTML = '';
-      
-      if (matches.length === 0) {
-        const selectedDate = new Date(dateInput.value);
-        const formattedDate = selectedDate.toLocaleDateString('si-LK');
-        
+    // Display results
+    function displayResults(inputNumbers, records) {
+      if (records.length === 0) {
         matchesContainer.innerHTML = `
           <div class="no-match">
-            <i class="fas fa-exclamation-circle"></i> ${formattedDate} දිනට ගැලපෙන ලොතරැයි ප්‍රතිඵල කිසිවක් හමු නොවීය.
+            <i class="fas fa-times-circle"></i> ${selectedDate} දිනයට ගැලපෙන ප්‍රතිඵල කිසිවක් හමු නොවීය.
           </div>
         `;
         return;
       }
       
-      // Create a card for the entered numbers
-      const enteredCard = document.createElement('div');
-      enteredCard.className = 'box-card';
-      enteredCard.innerHTML = `
-        <div class="box-header">
-          <h3><i class="fas fa-keyboard"></i> ඔබ ඇතුළත් කළ අංක</h3>
-          <span class="box-badge">ප්‍රධාන</span>
-        </div>
-        <div class="match-item">
-          <div class="match-meta">
-            <b>අංක 6</b>
-            ${enteredNumbers}
-          </div>
-          <div class="match-content">
-            <div class="match-digits">${formatNumber(enteredNumbers)}</div>
-            <div class="match-full">පළමු 3: ${enteredNumbers.substring(0, 3)} | අවසාන 3: ${enteredNumbers.substring(3)}</div>
-          </div>
-          <div class="match-below highlight">
-            <b>ගණනය කිරීම්</b><br>
-            පළමු 3 එකතුව: ${calculateDigitSum(enteredNumbers.substring(0, 3))}<br>
-            අවසාන 3 එකතුව: ${calculateDigitSum(enteredNumbers.substring(3))}
-          </div>
-        </div>
-      `;
+      matchesContainer.innerHTML = '';
       
-      matchesContainer.appendChild(enteredCard);
-      
-      // Create cards for each match
-      matches.forEach((match, index) => {
-        const matchCard = document.createElement('div');
-        matchCard.className = 'box-card';
+      records.forEach(record => {
+        const recordNumbers = record.digits6;
         
-        // Apply the new calculation logic
-        const firstThree = match.numbers.slice(0, 3);
-        const lastThree = match.numbers.slice(3);
+        // Calculate first 3 and last 3 sums
+        const firstThree = recordNumbers.substring(0, 3);
+        const lastThree = recordNumbers.substring(3);
         
-        const firstSum = firstThree.reduce((a, b) => a + b, 0);
-        const lastSum = lastThree.reduce((a, b) => a + b, 0);
+        const firstThreeSum = calculateDigitSum(firstThree);
+        const lastThreeSum = calculateDigitSum(lastThree);
         
-        const firstFinal = reduceToSingleDigit(firstSum);
-        const lastFinal = reduceToSingleDigit(lastSum);
+        const finalResult = calculateDigitSum(String(firstThreeSum + lastThreeSum));
         
-        const finalResult = reduceToSingleDigit(firstFinal + lastFinal);
+        // Create result card
+        const card = document.createElement('div');
+        card.className = 'box-card';
         
-        matchCard.innerHTML = `
+        card.innerHTML = `
           <div class="box-header">
-            <h3><i class="fas fa-calendar-alt"></i> ${match.date}</h3>
-            <span class="box-badge">${match.code}</span>
+            <h3>
+              <i class="fas fa-calendar-alt"></i> ${record.date}
+              <span class="box-badge">${record.code}</span>
+            </h3>
+            <div class="match-full">${record.digits6}</div>
           </div>
           <div class="match-item">
             <div class="match-meta">
-              <b>ප්‍රතිඵලය</b>
-              #${index + 1}<br>
-              කේතය: ${match.code}<br>
-              අවසන් 2: ${match.last2 || match.lastTwo || '-'}
+              <b>පළමු 3</b> ${firstThree}
             </div>
             <div class="match-content">
-              <div class="match-digits">${formatNumber(match.digits6)}</div>
-              <div class="match-full">සම්පූර්ණ අංක: ${match.numbers.join(' ')}</div>
+              <div class="match-digits">එකතුව: ${firstThree} → ${firstThreeSum}</div>
             </div>
             <div class="match-below">
-              <b>ගණනය කිරීම්</b><br>
-              පළමු අංක 3: ${firstThree.join(' + ')} = ${firstSum} → ${firstFinal}<br>
-              අවසාන අංක 3: ${lastThree.join(' + ')} = ${lastSum} → ${lastFinal}<br>
-              අවසාන ප්‍රතිඵලය: ${firstFinal} + ${lastFinal} = ${finalResult}
+              <i class="fas fa-plus"></i> එකතු කිරීම
+            </div>
+          </div>
+          <div class="match-item">
+            <div class="match-meta">
+              <b>අවසාන 3</b> ${lastThree}
+            </div>
+            <div class="match-content">
+              <div class="match-digits">එකතුව: ${lastThree} → ${lastThreeSum}</div>
+            </div>
+            <div class="match-below">
+              <i class="fas fa-plus"></i> එකතු කිරීම
+            </div>
+          </div>
+          <div class="match-item">
+            <div class="match-meta">
+              <b>අවසාන ප්‍රතිඵලය</b>
+            </div>
+            <div class="match-content">
+              <div class="match-digits">${firstThreeSum} + ${lastThreeSum} = ${firstThreeSum + lastThreeSum}</div>
+            </div>
+            <div class="match-below highlight">
+              <i class="fas fa-equals"></i> ${finalResult}
             </div>
           </div>
         `;
         
-        matchesContainer.appendChild(matchCard);
+        matchesContainer.appendChild(card);
       });
     }
 
-    // Format number with spaces for better readability
-    function formatNumber(numStr) {
-      return numStr.split('').join(' ');
-    }
-
     // Calculate digit sum (reduce to single digit)
-    function calculateDigitSum(digits) {
-      let sum = digits.split('').reduce((acc, digit) => acc + parseInt(digit), 0);
+    function calculateDigitSum(numbers) {
+      let sum = numbers.split('').reduce((acc, digit) => acc + parseInt(digit), 0);
       
-      // Reduce to single digit if needed
+      // Reduce to single digit
       while (sum > 9) {
         sum = String(sum).split('').reduce((acc, digit) => acc + parseInt(digit), 0);
       }
@@ -1556,104 +1472,58 @@
       return sum;
     }
 
-    // Reduce a number to a single digit using digit sum
-    function reduceToSingleDigit(num) {
-      let result = num;
-      while (result > 9) {
-        result = result.toString().split('').reduce((sum, digit) => sum + parseInt(digit), 0);
-      }
-      return result;
-    }
-
-    // Export results to Excel
+    // Export to Excel
     function exportToExcel() {
-      if (matchesContainer.querySelector('.no-match')) {
-        showAlert('අවවාදයයි', 'අපනයනය කිරීමට දත්ත නොමැත.');
+      if (lotteryData.length === 0) {
+        showAlert('රික්ත දත්ත', 'අපනයනය කිරීමට දත්ත නොමැත', 'warning');
         return;
       }
       
       try {
-        // Create a workbook
-        const wb = XLSX.utils.book_new();
-        
-        // Prepare data for export
-        const data = [['දිනය', 'කේතය', 'අවසන් 2', '6 අංක', 'පළමු 3 එකතුව', 'අවසාන 3 එකතුව']];
-        
-        // Add each match to the data array
-        const matchItems = matchesContainer.querySelectorAll('.box-card');
-        matchItems.forEach(card => {
-          const date = card.querySelector('.box-header h3').textContent.replace('⏰ ', '').trim();
-          const code = card.querySelector('.box-badge').textContent;
-          const digits6 = card.querySelector('.match-digits').textContent.replace(/ /g, '');
-          const firstThreeSum = card.querySelector('.match-below').textContent.split('\n')[1].split(':')[1].trim();
-          const lastThreeSum = card.querySelector('.match-below').textContent.split('\n')[2].split(':')[1].trim();
-          
-          // Try to get lastTwo from the match-meta
-          let lastTwo = 'N/A';
-          const metaText = card.querySelector('.match-meta').textContent;
-          const lastTwoMatch = metaText.match(/අවසන් 2:\s*(\d+)/);
-          if (lastTwoMatch) {
-            lastTwo = lastTwoMatch[1];
-          }
-          
-          data.push([date, code, lastTwo, digits6, firstThreeSum, lastThreeSum]);
-        });
-        
         // Create worksheet
-        const ws = XLSX.utils.aoa_to_sheet(data);
+        const ws = XLSX.utils.json_to_sheet(lotteryData);
         
-        // Add worksheet to workbook
-        XLSX.utils.book_append_sheet(wb, ws, 'ලොතරැයි ප්‍රතිඵල');
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Lottery Results');
         
         // Export to Excel
-        XLSX.writeFile(wb, 'lottery_analysis.xlsx');
+        XLSX.writeFile(wb, 'lottery_results.xlsx');
         
-        showAlert('සාර්ථකයි', 'Excel ගොනුව සාර්ථකව බාගත කරන ලදී.', 'success');
+        showAlert('සාර්ථකව අපනයනය කරන ලදී', 'Excel ගොනුව බාගත කර ඇත', 'success');
       } catch (error) {
-        console.error('Excel අපනයන දෝෂය:', error);
-        showAlert('දෝෂය', 'Excel ගොනුව බාගත කිරීමට නොහැකි විය.', 'error');
+        console.error('Error exporting to Excel:', error);
+        showAlert('අපනයන දෝෂය', 'Excel ගොනුව තැනීමට නොහැකි විය', 'error');
       }
     }
 
-    // Copy results to clipboard as text
-    function copyResultsToClipboard() {
-      if (matchesContainer.querySelector('.no-match')) {
-        showAlert('අවවාදයයි', 'පිටපත් කිරීමට දත්ත නොමැත.');
+    // Copy to clipboard
+    function copyToClipboard() {
+      if (lotteryData.length === 0) {
+        showAlert('රික්ත දත්ත', 'පිටපත් කිරීමට දත්ත නොමැත', 'warning');
         return;
       }
       
       try {
-        let text = 'ලොතරැයි ප්‍රතිඵල විශ්ලේෂණය\n';
-        text += '==========================\n\n';
-        
-        // Add each match to the text
-        const matchItems = matchesContainer.querySelectorAll('.box-card');
-        matchItems.forEach(card => {
-          const title = card.querySelector('.box-header h3').textContent;
-          const code = card.querySelector('.box-badge').textContent;
-          const digits6 = card.querySelector('.match-digits').textContent;
-          const calculations = card.querySelector('.match-below').textContent.replace(/\n/g, ' | ');
-          
-          text += `${title} [${code}]\n`;
-          text += `අංක: ${digits6}\n`;
-          text += `ගණනය කිරීම්: ${calculations}\n\n`;
-        });
+        // Convert data to text
+        const textData = lotteryData.map(record => 
+          `${record.date}, ${record.code}, ${record.lastTwo}, ${record.digits6}`
+        ).join('\n');
         
         // Copy to clipboard
-        navigator.clipboard.writeText(text).then(() => {
-          showAlert('සාර්ථකයි', 'ප්‍රතිඵල පිටපතක් ලෙස සටහන් කරන ලදී.', 'success');
+        navigator.clipboard.writeText(textData).then(() => {
+          showAlert('පිටපත් කර ඇත', 'දත්ත පිටපත් කර ඇත', 'success');
         }).catch(err => {
-          console.error('පිටපත් කිරීමේ දෝෂය:', err);
-          showAlert('දෝෂය', 'පිටපත් කිරීමට නොහැකි විය.', 'error');
+          throw new Error('Clipboard write failed');
         });
       } catch (error) {
-        console.error('පෙළ අපනයන දෝෂය:', error);
-        showAlert('දෝෂය', 'ප්‍රතිඵල පිටපත් කිරීමට නොහැකි විය.', 'error');
+        console.error('Error copying to clipboard:', error);
+        showAlert('පිටපත් දෝෂය', 'දත්ත පිටපත් කිරීමට නොහැකි විය', 'error');
       }
     }
 
     // Initialize the app when DOM is loaded
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
